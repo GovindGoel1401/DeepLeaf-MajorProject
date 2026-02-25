@@ -8,10 +8,11 @@ import { Switch } from "./ui/switch";
 
 interface QuerySectionProps {
   onSubmitQuery: (query: string, language: string) => void;
+  onQueryChange?: (query: string, language: string) => void;
   isProcessing: boolean;
 }
 
-export function QuerySection({ onSubmitQuery, isProcessing }: QuerySectionProps) {
+export function QuerySection({ onSubmitQuery, onQueryChange, isProcessing }: QuerySectionProps) {
   const [query, setQuery] = useState("");
   const [isHindi, setIsHindi] = useState(false);
 
@@ -23,6 +24,11 @@ export function QuerySection({ onSubmitQuery, isProcessing }: QuerySectionProps)
     if (query.trim()) {
       onSubmitQuery(query, isHindi ? 'hindi' : 'english');
     }
+  };
+
+  const handleQueryInput = (value: string) => {
+    setQuery(value);
+    onQueryChange?.(value, isHindi ? "hindi" : "english");
   };
 
   return (
@@ -59,7 +65,7 @@ export function QuerySection({ onSubmitQuery, isProcessing }: QuerySectionProps)
         <Textarea
           placeholder={placeholder}
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => handleQueryInput(e.target.value)}
           className="min-h-[120px] border-gray-300 resize-none"
           dir={isHindi ? 'auto' : 'ltr'}
         />
@@ -79,7 +85,7 @@ export function QuerySection({ onSubmitQuery, isProcessing }: QuerySectionProps)
           
           {query && (
             <Button 
-              onClick={() => setQuery('')}
+              onClick={() => handleQueryInput('')}
               variant="outline"
               className="border-gray-300"
             >

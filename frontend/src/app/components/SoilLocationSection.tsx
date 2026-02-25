@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { MapPin, Cloud, Droplets, Thermometer } from "lucide-react";
 import { Card } from "./ui/card";
 import { Label } from "./ui/label";
@@ -19,17 +19,22 @@ interface WeatherData {
 
 interface SoilLocationSectionProps {
   onSoilChange: (soilType: string) => void;
+  onFertilizerChange: (fertilizer: string) => void;
   onLocationChange: (location: string) => void;
+  onCoordinatesChange: (coords: { latitude?: number; longitude?: number }) => void;
   weatherData: WeatherData | null;
 }
 
 export function SoilLocationSection({ 
   onSoilChange, 
+  onFertilizerChange,
   onLocationChange,
+  onCoordinatesChange,
   weatherData 
 }: SoilLocationSectionProps) {
   const [soilType, setSoilType] = useState("");
   const [customSoil, setCustomSoil] = useState("");
+  const [fertilizer, setFertilizer] = useState("");
   const [location, setLocation] = useState("");
 
   const handleSoilChange = (value: string) => {
@@ -41,6 +46,19 @@ export function SoilLocationSection({
     const value = e.target.value;
     setLocation(value);
     onLocationChange(value);
+  };
+
+  const handleUseDeviceLocation = () => {
+    if (!navigator.geolocation) {
+      return;
+    }
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const latitude = pos.coords.latitude;
+      const longitude = pos.coords.longitude;
+      setLocation(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+      onLocationChange(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+      onCoordinatesChange({ latitude, longitude });
+    });
   };
 
   return (
@@ -81,6 +99,22 @@ export function SoilLocationSection({
           />
         </div>
 
+        <div className="space-y-2">
+          <Label htmlFor="fertilizer" className="text-gray-700">
+            Fertilizer Used (Optional)
+          </Label>
+          <Input
+            id="fertilizer"
+            placeholder="e.g., Urea, DAP, NPK 20-20-20"
+            value={fertilizer}
+            onChange={(e) => {
+              setFertilizer(e.target.value);
+              onFertilizerChange(e.target.value);
+            }}
+            className="border-gray-300"
+          />
+        </div>
+
         {/* Location Input */}
         <div className="space-y-2">
           <Label htmlFor="location" className="text-gray-700">
@@ -96,6 +130,13 @@ export function SoilLocationSection({
               className="pl-10 border-gray-300"
             />
           </div>
+          <button
+            type="button"
+            onClick={handleUseDeviceLocation}
+            className="text-sm text-green-700 hover:text-green-800 underline underline-offset-2"
+          >
+            Use current device location
+          </button>
         </div>
 
         {/* Weather Display Card */}
