@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-from neo4j import AsyncGraphDatabase, AsyncDriver
+from neo4j import AsyncDriver, AsyncGraphDatabase
 
 from database.neo4j_config import NEO4J_PASSWORD, NEO4J_URI, NEO4J_USER
 
@@ -16,21 +16,36 @@ class DiseaseRelation:
 
 class GraphService:
     """
-    Phase 4: minimal Neo4j integration.
-
-    Keeps the driver managed centrally and exposes a couple of small query methods.
+    Neo4j integration for deterministic graph reasoning.
     """
 
     def __init__(self) -> None:
         self._driver: Optional[AsyncDriver] = None
 
+    @staticmethod
+    def _disease_keys(disease: str) -> List[str]:
+        raw = (disease or "").strip()
+        if not raw:
+            return []
+        keys = {
+            raw.lower(),
+            raw.replace("_", " ").lower(),
+            raw.replace("-", " ").lower(),
+        }
+        compact = raw.replace("_", "").replace("-", "").replace(" ", "").lower()
+        if compact:
+            keys.add(compact)
+        return list(keys)
+
     async def connect(self) -> None:
         if self._driver is not None:
             return
+
         self._driver = AsyncGraphDatabase.driver(
             NEO4J_URI,
             auth=(NEO4J_USER, NEO4J_PASSWORD),
         )
+
         try:
             await self._driver.verify_connectivity()
         except Exception:
@@ -44,31 +59,27 @@ class GraphService:
         await self._driver.close()
         self._driver = None
 
-    def _require_driver(self) -> AsyncDriver:
-        if self._driver is None:
-            raise RuntimeError("Neo4j driver is not initialised. Call GraphService.connect() on startup.")
-        return self._driver
-
     async def get_disease_relations(self, disease: str, limit: int = 10) -> List[DiseaseRelation]:
         """
-        Example query: fetch related nodes/relations around a Disease node.
-
-        Graph schema can evolve; this method is intentionally generic.
-        Returns empty list if Neo4j is not connected (e.g. not running).
+        Fetch related nodes around a Disease node.
+        Returns empty list when Neo4j is unavailable.
         """
         if self._driver is None:
             return []
 
-        driver = self._driver
+        disease_keys = self._disease_keys(disease)
+        if not disease_keys:
+            return []
 
         cypher = """
-        MATCH (d:Disease {name: $disease})-[r]->(n)
+        MATCH (d:Disease)-[r]->(n)
+        WHERE toLower(coalesce(d.name, "")) IN $disease_keys
         RETURN type(r) AS relation, coalesce(n.name, n.id, toString(id(n))) AS target
         LIMIT $limit
         """
 
-        async with driver.session() as session:
-            result = await session.run(cypher, disease=disease, limit=limit)
+        async with self._driver.session() as session:
+            result = await session.run(cypher, disease_keys=disease_keys, limit=limit)
             records = await result.data()
 
         return [DiseaseRelation(relation=row["relation"], target=row["target"]) for row in records]
@@ -83,16 +94,20 @@ class GraphService:
         limit: int = 20,
     ) -> List[DiseaseRelation]:
         """
-        Query disease-adjacent nodes that match contextual evidence.
+        Find disease-adjacent nodes matching contextual evidence.
         """
         if self._driver is None:
             return []
 
         symptoms = symptoms or []
-        driver = self._driver
+
+        disease_keys = self._disease_keys(disease)
+        if not disease_keys:
+            return []
 
         cypher = """
-        MATCH (d:Disease {name: $disease})-[r]-(n)
+        MATCH (d:Disease)-[r]-(n)
+        WHERE toLower(coalesce(d.name, "")) IN $disease_keys
         WITH r, n, toLower(coalesce(n.name, "")) AS nn
         WHERE
             ($soil <> "" AND nn CONTAINS toLower($soil))
@@ -102,10 +117,10 @@ class GraphService:
         LIMIT $limit
         """
 
-        async with driver.session() as session:
+        async with self._driver.session() as session:
             result = await session.run(
                 cypher,
-                disease=disease,
+                disease_keys=disease_keys,
                 soil=soil,
                 fertilizer=fertilizer,
                 symptoms=symptoms,
@@ -115,12 +130,55 @@ class GraphService:
 
         return [DiseaseRelation(relation=row["relation"], target=row["target"]) for row in records]
 
-    async def health(self) -> Dict[str, Any]:
+    async def rank_diseases(
+        self,
+        humidity: int | float,
+        fertilizer: str,
+        soil: str,
+    ) -> List[Dict[str, Any]]:
         """
-        Lightweight health check for Neo4j.
+        Rank diseases by contextual weighted edges.
+        Returns empty list when Neo4j is unavailable.
         """
         if self._driver is None:
+            return []
+
+        cypher = """
+        MATCH (d:Disease)
+
+        OPTIONAL MATCH (d)-[:HIGH_RISK_IF]->(w:WeatherCondition)
+        WHERE w.parameter = "humidity" AND $humidity >= 80
+
+        OPTIONAL MATCH (d)-[:WORSENED_BY]->(f:Fertilizer)
+        WHERE toLower(f.name) = toLower($fertilizer)
+
+        OPTIONAL MATCH (d)-[:MORE_LIKELY_IN]->(s:SoilType)
+        WHERE toLower(s.name) = toLower($soil)
+
+        WITH d,
+        sum(COALESCE(w.weight,0)) +
+        sum(COALESCE(f.weight,0)) +
+        sum(COALESCE(s.weight,0)) AS score
+
+        RETURN d.name AS disease, score
+        ORDER BY score DESC
+        """
+
+        async with self._driver.session() as session:
+            result = await session.run(
+                cypher,
+                humidity=float(humidity),
+                fertilizer=fertilizer or "",
+                soil=soil or "",
+            )
+            records = await result.data()
+
+        return records
+
+    async def health(self) -> Dict[str, Any]:
+        if self._driver is None:
             return {"neo4j": "unavailable"}
+
         try:
             async with self._driver.session() as session:
                 result = await session.run("RETURN 1 AS ok")
@@ -130,6 +188,4 @@ class GraphService:
             return {"neo4j": "error"}
 
 
-# Singleton instance for the app.
 graph_service = GraphService()
-

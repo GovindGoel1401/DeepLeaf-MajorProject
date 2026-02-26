@@ -1,6 +1,7 @@
 # Node / frontend
 frontend/node_modules/
 **/node_modules/
+frontend/dist/
 
 # Python
 __pycache__/
@@ -11,6 +12,12 @@ __pycache__/
 .venv/
 venv/
 
+# ML/data/model artifacts
+ML_Training/dataset/
+backend/ricecare-ai/app/models/*.pth
+backend/ricecare-ai/vectorstore/
+*.sqlite3
+
 # Environment / secrets
 .env
 **/.env
@@ -19,4 +26,3 @@ venv/
 .DS_Store
 Thumbs.db
 .vscode/
-

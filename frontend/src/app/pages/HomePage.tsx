@@ -7,6 +7,24 @@ import { AdvisoryOutput, AdvisoryData } from "../components/AdvisoryOutput";
 import { SystemExplanation } from "../components/SystemExplanation";
 import { analyzePipeline } from "../services/pipelineApi";
 
+export interface ComparisonPayload {
+  graphrag: { score: number; label: string; summary: string };
+  rag_only: { score: number; label: string; summary: string };
+  breakdown?: {
+    confidence_signal: number;
+    rag_signal: number;
+    graph_signal: number;
+    graph_bonus: number;
+    weather_bonus: number;
+    graphrag_formula: string;
+    rag_only_formula: string;
+  };
+}
+
+interface HomePageProps {
+  onOpenCompare?: (data: ComparisonPayload) => void;
+}
+
 function parseCoordinates(raw: string): { latitude?: number; longitude?: number } {
   const parts = raw.split(",").map((p) => p.trim());
   if (parts.length !== 2) return {};
@@ -18,16 +36,17 @@ function parseCoordinates(raw: string): { latitude?: number; longitude?: number 
   return { latitude: lat, longitude: lon };
 }
 
-export function HomePage() {
+export function HomePage({ onOpenCompare }: HomePageProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [confidence, setConfidence] = useState<number | undefined>(undefined);
+  const [uiConfidencePct, setUiConfidencePct] = useState<number | undefined>(undefined);
   const [soilType, setSoilType] = useState("");
   const [fertilizer, setFertilizer] = useState("");
   const [description, setDescription] = useState("");
   const [coords, setCoords] = useState<{ latitude?: number; longitude?: number }>({});
   const [weatherData, setWeatherData] = useState<{ temperature: number; humidity: number; rainfall: number } | null>(null);
   const [advisoryData, setAdvisoryData] = useState<AdvisoryData | null>(null);
+  const [comparisonData, setComparisonData] = useState<ComparisonPayload | null>(null);
   const [errorText, setErrorText] = useState<string | null>(null);
 
   const analysisRef = useRef<HTMLDivElement>(null);
@@ -51,18 +70,44 @@ export function HomePage() {
         longitude: coords.longitude,
       });
 
-      setConfidence((response.disease_prediction?.confidence || 0) * 100);
+      const rawConfidence =
+        typeof response.confidence === "number"
+          ? response.confidence
+          : typeof response.disease_prediction?.confidence === "number"
+            ? response.disease_prediction.confidence
+            : 0;
+
+      const diseaseName = response.predicted_disease || response.disease_prediction?.disease || "Unknown";
+
+      setUiConfidencePct(Math.round(rawConfidence * 100));
       setWeatherData(response.weather || null);
 
       setAdvisoryData({
-        disease: response.disease_prediction?.disease || "Unknown",
-        confidence: response.disease_prediction?.confidence || 0,
-        advisory: response.advisory || "No advisory returned.",
-        weather: response.weather,
-        graphRiskScore: response.graph_evidence?.graph_risk_score,
+        disease: diseaseName,
+        confidence: rawConfidence,
+        advisory: response.advisory || response.analysis || "No advisory returned.",
+        weather: response.weather || null,
+        graphRiskScore:
+          typeof response.risk_score === "number"
+            ? response.risk_score
+            : response.graph_evidence?.graph_risk_score,
         supportingFactors: response.graph_evidence?.supporting_factors || [],
         ragContext: response.rag_context || [],
+        treatment: response.treatment || [],
+        prevention: response.prevention || [],
+        fertilizerCorrection: response.fertilizer_correction || "",
+        explanations: response.explanations,
+        graphLinked: Boolean(response.debug?.neo4j_connected),
+        graphRelationsFound: typeof response.debug?.graph_relations_found === "number" ? response.debug.graph_relations_found : undefined,
       });
+
+      const comparisonPayload = response.comparison
+        ? {
+            ...response.comparison,
+            breakdown: response.comparison_breakdown,
+          }
+        : null;
+      setComparisonData(comparisonPayload);
 
       setTimeout(() => {
         resultsRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -123,7 +168,7 @@ export function HomePage() {
       <div ref={analysisRef} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
           <div className="space-y-8">
-            <ImageUploadSection onAnalyze={handleImageAnalyze} isAnalyzing={isAnalyzing} confidence={confidence} />
+            <ImageUploadSection onAnalyze={handleImageAnalyze} isAnalyzing={isAnalyzing} confidence={uiConfidencePct} />
 
             <SoilLocationSection
               onSoilChange={handleSoilChange}
@@ -136,6 +181,15 @@ export function HomePage() {
 
           <div>
             <QuerySection onSubmitQuery={handleQuerySubmit} onQueryChange={handleQueryChange} isProcessing={isAnalyzing} />
+            {comparisonData && (
+              <button
+                type="button"
+                onClick={() => comparisonData && onOpenCompare?.(comparisonData)}
+                className="mt-3 w-full rounded-md border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm text-emerald-800 hover:bg-emerald-100"
+              >
+                Compare (New Page)
+              </button>
+            )}
             {errorText && <p className="mt-3 text-sm text-red-600">{errorText}</p>}
           </div>
         </div>

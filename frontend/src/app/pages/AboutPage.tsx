@@ -1,7 +1,9 @@
-import { Target, Users, Award, TrendingUp, Leaf, Globe } from "lucide-react";
+import { useState } from "react";
+import { Target, TrendingUp, Leaf, Globe, Workflow, X } from "lucide-react";
 import { Card } from "../components/ui/card";
 
 export function AboutPage() {
+  const [showWorkflow, setShowWorkflow] = useState(false);
   const mission = [
     {
       icon: Target,
@@ -64,6 +66,33 @@ export function AboutPage() {
     "State Agricultural Universities",
     "Farmer Producer Organizations (FPOs)",
     "Krishi Vigyan Kendras (KVKs)"
+  ];
+
+  const workflow = [
+    {
+      title: "1. Image Classification (CNN)",
+      why: "EfficientNet-B0 predicts disease label from leaf image. This keeps disease detection deterministic and visual-grounded.",
+    },
+    {
+      title: "2. Input Structuring (LLM Parser)",
+      why: "Farmer text in Hindi/English is converted into structured fields: symptoms, fertilizer, soil, growth-stage.",
+    },
+    {
+      title: "3. Weather Context",
+      why: "Latitude/longitude fetch live weather so disease pressure is tied to real field conditions.",
+    },
+    {
+      title: "4. Graph Reasoning (Neo4j)",
+      why: "Graph traversal validates disease links against scientific relationships (soil, fertilizer, stage, pathogen, condition).",
+    },
+    {
+      title: "5. Vector Retrieval (RAG)",
+      why: "Pinecone retrieves relevant research snippets and management guidance beyond fixed graph edges.",
+    },
+    {
+      title: "6. Final Advisory Synthesis",
+      why: "Gemini combines CNN output + graph evidence + RAG context + weather into farmer-friendly, actionable advice.",
+    },
   ];
 
   return (
@@ -137,6 +166,16 @@ export function AboutPage() {
               every model we train, and every recommendation we provide is designed with the farmer at 
               the center.
             </p>
+          </div>
+          <div className="mt-8 flex justify-center">
+            <button
+              type="button"
+              onClick={() => setShowWorkflow(true)}
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-6 py-3 text-white transition hover:bg-emerald-700"
+            >
+              <Workflow className="h-5 w-5" />
+              Workflow
+            </button>
           </div>
         </div>
       </div>
@@ -212,6 +251,35 @@ export function AboutPage() {
           </div>
         </div>
       </div>
+
+      {showWorkflow && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[88vh] w-full max-w-4xl overflow-y-auto rounded-2xl border border-emerald-200 bg-white shadow-2xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-emerald-100 bg-white px-6 py-4">
+              <div>
+                <h3 className="text-2xl text-emerald-900">How RiceCare AI Works</h3>
+                <p className="text-sm text-gray-600">End-to-end GraphRAG pipeline with justification for each layer</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowWorkflow(false)}
+                className="rounded-md p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 p-6">
+              {workflow.map((step, idx) => (
+                <Card key={idx} className="border-emerald-200 bg-emerald-50/40 p-4">
+                  <h4 className="text-lg text-emerald-900">{step.title}</h4>
+                  <p className="mt-1 text-sm text-gray-700">{step.why}</p>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

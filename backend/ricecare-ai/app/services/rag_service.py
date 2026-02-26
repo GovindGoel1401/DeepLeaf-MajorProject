@@ -167,18 +167,42 @@ class RagService:
 rag_service = RagService()
 
 
+def _compact_text(text: str, max_chars: int = 240) -> str:
+    clean = " ".join((text or "").split())
+    if len(clean) <= max_chars:
+        return clean
+
+    # Prefer a sentence-like cutoff.
+    cutoff = clean.rfind(".", 0, max_chars)
+    if cutoff > 80:
+        return clean[: cutoff + 1]
+    return clean[:max_chars].rstrip() + "..."
+
+
+def _is_readable(text: str) -> bool:
+    tokens = [t for t in text.split() if t]
+    if not tokens:
+        return False
+    avg_len = sum(len(t) for t in tokens) / len(tokens)
+    # Filter out OCR-like noise with extremely long merged tokens.
+    return avg_len <= 14
+
+
 async def retrieve_rag_context(query: str, k: int = 4) -> List[Dict[str, Any]]:
     try:
         docs = await rag_service.retrieve(query=query, k=k)
     except Exception:
         return []
 
+    filtered = [doc for doc in docs if _is_readable(doc.text)]
+    selected = filtered[:3] if filtered else docs[:2]
+
     return [
         {
             "id": doc.id,
-            "text": doc.text,
+            "text": _compact_text(doc.text, max_chars=240),
             "source": doc.source,
             "score": doc.score,
         }
-        for doc in docs
+        for doc in selected
     ]

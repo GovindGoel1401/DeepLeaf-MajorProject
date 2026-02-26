@@ -1,0 +1,2 @@
+"""RiceCare AI backend package."""
+
