@@ -28,6 +28,9 @@ def _deterministic_fallback(context: Dict[str, Any], *, mode: str) -> Dict[str, 
     weather = context.get("weather", {}) or {}
     graph_evidence = context.get("graph_evidence", {}) or {}
     extracted = context.get("extracted", {}) or {}
+    ranking = context.get("disease_ranking", []) if isinstance(context.get("disease_ranking"), list) else []
+    confidence_index = float(context.get("confidence_index", 0.0) or 0.0)
+    advisory_mode = str(context.get("advisory_mode") or "medium_confidence")
 
     disease_name = str(disease.get("disease", "unknown"))
     conf = float(disease.get("confidence", 0.0))
@@ -54,6 +57,8 @@ def _deterministic_fallback(context: Dict[str, Any], *, mode: str) -> Dict[str, 
 
     analysis = (
         f"Predicted disease is {disease_name} with model confidence {round(conf * 100)}%. "
+        f"Top graph rank: {ranking[0].get('disease') if ranking else disease_name}. "
+        f"Confidence index: {round(confidence_index * 100)}% ({advisory_mode}). "
         f"Observed symptoms: {', '.join(symptoms) if symptoms else 'not clearly extracted'}. "
         f"Weather around field is temperature {temp}, humidity {humidity}, rainfall {rainfall}. "
         f"{'Graph matches found: ' + ', '.join(factors[:3]) + '.' if factors else 'Graph matches are limited in current query.'} "
@@ -116,11 +121,15 @@ async def generate_advisory(context: Dict[str, Any]) -> Dict[str, Any]:
     graph_evidence = context.get("graph_evidence", {})
     rag_context = context.get("rag_context", [])
     extracted = context.get("extracted", {})
+    disease_ranking = context.get("disease_ranking", [])
+    confidence_index = context.get("confidence_index", 0.0)
+    advisory_mode = context.get("advisory_mode", "medium_confidence")
 
     prompt = (
         "You are an expert rice disease advisory assistant.\n"
         "Use only the provided evidence. Do NOT change the predicted disease label.\n"
         "Explain clearly for farmers and avoid generic one-line advice.\n"
+        "If confidence is low, explicitly recommend field verification.\n"
         "Return ONLY valid JSON (no markdown) using this schema:\n"
         "{\n"
         "  \"analysis\": string,\n"
@@ -134,7 +143,10 @@ async def generate_advisory(context: Dict[str, Any]) -> Dict[str, Any]:
         "- prevention must contain at least 5 concrete actions\n"
         "- analysis must explain why risk is high/medium/low using weather + graph + symptoms\n"
         "- final_message must be 120-220 words, practical and farmer-friendly\n\n"
+        f"Advisory confidence mode: {advisory_mode}\n"
+        f"Confidence index: {confidence_index}\n"
         f"Disease prediction: {json.dumps(disease, ensure_ascii=False)}\n"
+        f"Disease ranking: {json.dumps(disease_ranking, ensure_ascii=False)}\n"
         f"Graph evidence: {json.dumps(graph_evidence, ensure_ascii=False)}\n"
         f"RAG context: {json.dumps(rag_context, ensure_ascii=False)}\n"
         f"Weather: {json.dumps(weather, ensure_ascii=False)}\n"

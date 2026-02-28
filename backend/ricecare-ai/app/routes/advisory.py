@@ -4,6 +4,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from app.services.advisory_service import synthesize_advice
+from app.services.crag_service import crag_service
+from app.services.graph_service import graph_service
 
 router = APIRouter()
 
@@ -27,6 +29,10 @@ class AdvisoryResponse(BaseModel):
     rag_context: list
     final_advice: str
     confidence_score: float
+    disease_ranking: list = Field(default_factory=list)
+    comparison_metrics: dict = Field(default_factory=dict)
+    confidence_index: float = 0.0
+    advisory_mode: str = "medium_confidence"
 
 
 @router.post("/", response_model=AdvisoryResponse)
@@ -46,6 +52,30 @@ async def create_advisory(payload: AdvisoryRequest) -> AdvisoryResponse:
             rainfall=payload.rainfall,
             user_query=payload.user_query,
         )
+        ranking = await graph_service.rank_diseases(
+            humidity=payload.humidity,
+            fertilizer="",
+            soil=payload.soil_type,
+            cnn_prediction=payload.disease,
+        )
+        ranking_list = ranking.get("ranking", [])
+        top_graph_score = float((ranking_list[0] if ranking_list else {}).get("score", 0.0))
+        crag = await crag_service.evaluate(
+            cnn_confidence=payload.confidence,
+            graph_score=top_graph_score,
+            vector_similarity=0.5,
+            cnn_prediction=payload.disease,
+            top_graph_disease=str(ranking.get("top_disease") or payload.disease),
+        )
+        result["disease_ranking"] = ranking_list
+        result["comparison_metrics"] = {
+            "cnn_confidence": payload.confidence,
+            "graph_score": top_graph_score,
+            "vector_similarity": 0.5,
+            "hybrid_score": crag.get("final_confidence", 0.0),
+        }
+        result["confidence_index"] = crag.get("final_confidence", 0.0)
+        result["advisory_mode"] = crag.get("confidence_level", "medium")
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 

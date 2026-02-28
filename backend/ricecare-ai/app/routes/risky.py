@@ -9,5 +9,7 @@ async def rank_disease(data: dict):
         humidity=data.get("humidity"),
         fertilizer=data.get("fertilizer"),
         soil=data.get("soil"),
+        cnn_prediction=data.get("cnn_prediction", ""),
+        symptoms=data.get("symptoms", []),
     )
     return result
