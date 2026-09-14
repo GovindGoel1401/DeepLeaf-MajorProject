@@ -33,10 +33,9 @@ export function SystemExplanation() {
     <div className="py-12 bg-gradient-to-br from-green-50 to-emerald-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
-          <h2 className="text-3xl text-green-900 mb-3">How DeepLeaf Works</h2>
+            <h2 className="text-3xl text-green-900 mb-3">How RiceCare AI Works</h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Our system combines cutting-edge AI technologies to provide accurate, 
-            reliable, and actionable agricultural insights
+            The backend combines image classification, graph reasoning, weather context, and RAG so the advice stays grounded in field conditions.
           </p>
         </div>
 
@@ -44,10 +43,7 @@ export function SystemExplanation() {
           {features.map((feature, index) => {
             const Icon = feature.icon;
             return (
-              <Card 
-                key={index} 
-                className="p-6 hover:shadow-lg transition-shadow border-green-200"
-              >
+                <Card key={index} className="p-6 hover:shadow-lg transition-shadow border-green-200">
                 <div className="flex items-start gap-4">
                   <div className={`${feature.color} p-3 rounded-lg flex-shrink-0`}>
                     <Icon className="w-6 h-6 text-white" />
@@ -72,16 +68,15 @@ export function SystemExplanation() {
               <Database className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h3 className="text-lg text-green-900 mb-2">Credibility & Accuracy</h3>
+              <h3 className="text-lg text-green-900 mb-2">Deployment Notes</h3>
               <p className="text-gray-700 mb-3">
-                DeepLeaf is built on rigorous scientific research and validated agricultural practices. 
-                Our models are continuously updated with the latest findings from agricultural research institutions 
-                and field data from farming communities.
+                RiceCare AI uses a hybrid path: the image model predicts a disease, the graph layer scores structured field context, the RAG layer
+                fetches supporting text, and the advisory layer synthesizes the final answer.
               </p>
               <p className="text-sm text-gray-600">
-                <strong>Accuracy Rate:</strong> 94.2% disease identification accuracy across 12 common rice diseases
+                <strong>Health check:</strong> Use the backend status banner to confirm graph and RAG readiness before field use.
                 <br />
-                <strong>Data Sources:</strong> IRRI, Agricultural Universities, Local Extension Services
+                <strong>Fallback behavior:</strong> The app still runs if Neo4j or the vector store is unavailable, but the advice is less grounded.
               </p>
             </div>
           </div>

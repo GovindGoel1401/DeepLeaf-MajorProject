@@ -1,11 +1,11 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { HeroSection } from "../components/HeroSection";
 import { ImageUploadSection } from "../components/ImageUploadSection";
 import { SoilLocationSection } from "../components/SoilLocationSection";
 import { QuerySection } from "../components/QuerySection";
 import { AdvisoryOutput, AdvisoryData } from "../components/AdvisoryOutput";
 import { SystemExplanation } from "../components/SystemExplanation";
-import { analyzePipeline } from "../services/pipelineApi";
+import { analyzePipeline, getBackendHealth } from "../services/pipelineApi";
 
 export interface ComparisonPayload {
   graphrag: { score: number; label: string; summary: string };
@@ -48,9 +48,24 @@ export function HomePage({ onOpenCompare }: HomePageProps) {
   const [advisoryData, setAdvisoryData] = useState<AdvisoryData | null>(null);
   const [comparisonData, setComparisonData] = useState<ComparisonPayload | null>(null);
   const [errorText, setErrorText] = useState<string | null>(null);
+  const [serviceHealth, setServiceHealth] = useState<{ graph?: string; rag?: string; ready?: boolean } | null>(null);
 
   const analysisRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    void getBackendHealth()
+      .then((health) => {
+        setServiceHealth({
+          graph: String(health.services.graph?.neo4j ?? "unknown"),
+          rag: String(health.services.rag?.rag ?? "unknown"),
+          ready: Boolean(health.services.ready),
+        });
+      })
+      .catch(() => {
+        setServiceHealth(null);
+      });
+  }, []);
 
   const handleAnalyzeClick = () => {
     analysisRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -164,6 +179,20 @@ export function HomePage({ onOpenCompare }: HomePageProps) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-green-50">
       <HeroSection onAnalyzeClick={handleAnalyzeClick} />
+
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-6">
+        <div className="rounded-2xl border border-emerald-200 bg-white/80 px-4 py-3 text-sm text-gray-700 shadow-sm backdrop-blur">
+          <span className="font-medium text-gray-900">AI stack status:</span>{" "}
+          {serviceHealth ? (
+            <>
+              <span>Graph {serviceHealth.graph ?? "unknown"}</span>, <span>RAG {serviceHealth.rag ?? "unknown"}</span>,{" "}
+              <span>{serviceHealth.ready ? "pipeline ready" : "pipeline degraded"}</span>
+            </>
+          ) : (
+            <span>health check unavailable</span>
+          )}
+        </div>
+      </div>
 
       <div ref={analysisRef} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">

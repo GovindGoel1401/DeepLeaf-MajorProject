@@ -69,6 +69,7 @@ class PipelineService:
                 fertilizer=final_fertilizer or "",
                 soil=final_soil or "",
                 cnn_prediction=cnn_prediction,
+                symptoms=extracted.get("symptoms", []),
             )
         except Exception as exc:
             errors_by_layer["graph_rank"] = str(exc)

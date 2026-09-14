@@ -73,6 +73,15 @@ export interface AnalyzePipelineResponse {
   };
 }
 
+export interface BackendHealthResponse {
+  status: string;
+  services: {
+    graph: Record<string, unknown>;
+    rag: Record<string, unknown>;
+    ready: boolean;
+  };
+}
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
 export async function analyzePipeline(
@@ -98,4 +107,15 @@ export async function analyzePipeline(
   }
 
   return (await response.json()) as AnalyzePipelineResponse;
+}
+
+export async function getBackendHealth(): Promise<BackendHealthResponse> {
+  const response = await fetch(`${API_BASE_URL}/health`);
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Health check failed (${response.status}): ${text}`);
+  }
+
+  return (await response.json()) as BackendHealthResponse;
 }

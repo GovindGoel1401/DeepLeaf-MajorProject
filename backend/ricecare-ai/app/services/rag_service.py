@@ -163,6 +163,53 @@ class RagService:
 
         return out
 
+    async def health(self) -> dict[str, object]:
+        backend = settings.vector_db_backend.lower().strip()
+        embedding_ready = bool(settings.gemini_api_key or settings.google_api_key)
+
+        if backend == "pinecone":
+            if not settings.pinecone_api_key:
+                return {
+                    "rag": "unavailable",
+                    "backend": backend,
+                    "embedding_ready": embedding_ready,
+                    "vector_store_ready": False,
+                    "reason": "PINECONE_API_KEY is missing",
+                }
+            try:
+                self._ensure_pinecone()
+                return {
+                    "rag": "ok" if embedding_ready else "degraded",
+                    "backend": backend,
+                    "embedding_ready": embedding_ready,
+                    "vector_store_ready": True,
+                }
+            except Exception as exc:
+                return {
+                    "rag": "error",
+                    "backend": backend,
+                    "embedding_ready": embedding_ready,
+                    "vector_store_ready": False,
+                    "reason": str(exc),
+                }
+
+        try:
+            self._ensure_chroma()
+            return {
+                "rag": "ok" if embedding_ready else "degraded",
+                "backend": backend,
+                "embedding_ready": embedding_ready,
+                "vector_store_ready": True,
+            }
+        except Exception as exc:
+            return {
+                "rag": "error",
+                "backend": backend,
+                "embedding_ready": embedding_ready,
+                "vector_store_ready": False,
+                "reason": str(exc),
+            }
+
 
 rag_service = RagService()
 

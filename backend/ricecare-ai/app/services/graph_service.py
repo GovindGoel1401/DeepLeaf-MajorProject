@@ -136,6 +136,7 @@ class GraphService:
         fertilizer: str,
         soil: str,
         cnn_prediction: str = "",
+        symptoms: List[str] | None = None,
     ) -> Dict[str, Any]:
         """
         Weighted multi-disease ranking with explainable factor contributions.
@@ -160,6 +161,11 @@ class GraphService:
         soil_norm = (soil or "").strip().lower()
         humidity_value = float(humidity or 0.0)
         cnn_norm = (cnn_prediction or "").strip().lower().replace("_", " ").replace("-", " ")
+        normalized_symptoms = {
+            (symptom or "").strip().lower().replace("_", " ").replace("-", " ")
+            for symptom in (symptoms or [])
+            if (symptom or "").strip()
+        }
 
         disease_query = """
         MATCH (d:Disease)
@@ -186,7 +192,11 @@ class GraphService:
             humidity_match = max(0.0, min(humidity_value / 100.0, 1.0))
             fertilizer_match = 1.0 if fertilizer_norm == "high_nitrogen" else 0.0
             soil_match = 1.0 if soil_norm in {"clay", "poor_drainage"} else 0.0
-            symptom_match = 1.0 if cnn_norm and cnn_norm == disease_norm else 0.0
+            symptom_overlap = any(
+                symptom in disease_norm or disease_norm in symptom
+                for symptom in normalized_symptoms
+            )
+            symptom_match = 1.0 if (cnn_norm and cnn_norm == disease_norm) or symptom_overlap else 0.0
 
             base_risk = float(row.get("base_risk", 0.2))
             humidity_weight = float(row.get("humidity_weight", 0.25))
@@ -232,7 +242,7 @@ class GraphService:
                 },
                 {
                     "factor": "symptoms",
-                    "value": f"cnn==disease ({cnn_norm == disease_norm})",
+                    "value": ", ".join(sorted(normalized_symptoms)) if normalized_symptoms else f"cnn==disease ({cnn_norm == disease_norm})",
                     "weight": round(symptom_weight, 4),
                     "impact": round(symptom_weight * symptom_match, 4),
                 },
