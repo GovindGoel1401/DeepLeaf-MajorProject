@@ -21,6 +21,8 @@ backend/ricecare-ai/vectorstore/
 # Environment / secrets
 .env
 **/.env
+*.stdout.log
+*.stderr.log
 
 # OS / editor
 .DS_Store
